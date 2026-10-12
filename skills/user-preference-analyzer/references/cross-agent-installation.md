@@ -66,6 +66,42 @@ On a new machine, copy the ledger and `SOURCES.md` only through an explicitly au
 - DeepSeek Harness's `skill-filesystem` provider searches its documented local roots and supports `SKILL.md` bundles; its project and user roots can be customized.
 - Zed's global Skills apply to Zed Agent; external agents and terminal threads may require their own installation.
 
+## Manual review
+
+In any installed Agent, ask: “查看置信度超过 0.9 的待确认偏好”. The Agent displays a concise list only on request, without a supporting-project list. Reply with record IDs, for example: “确认 PF-001；拒绝 PF-002；PF-003 仅限当前项目；PF-004 暂缓”. A scope-only change does not confirm the record.
+
+From the installed Skill directory, inspect a project ledger or the shared global ledger:
+
+```sh
+python3 scripts/preference_tool.py --root /path/to/project review
+python3 scripts/preference_tool.py --global-store review --format json
+```
+
+`review` defaults to readable text. JSON returns `version`, `policy`, and `candidates`. Each candidate contains ID, description, value, confidence, proposed status, evidence summary (at most 100 characters), scope, last validation date, active conflict IDs, and a stale flag. The filter is strictly `> 0.9`, not `>= 0.9`; records are sorted by confidence descending, then ID. Staleness uses 180 days. This command does not write the ledger.
+
+The Agent retains the version of the list actually shown and writes only the user's choices to a local temporary JSON file. Example input (illustrative IDs and scopes):
+
+```json
+[
+  {"id": "PF-001", "action": "confirm"},
+  {"id": "PF-002", "action": "reject"},
+  {"id": "PF-003", "scope": "Only the current project: Example Project"},
+  {"id": "PF-004", "action": "defer"}
+]
+```
+
+Omitting `action` while supplying `scope` changes scope only. `confirm` may also include a new scope if the user explicitly requested both. `defer` cannot include a scope change. Submit with the full returned version (replace the example version and file path):
+
+```sh
+python3 scripts/preference_tool.py --global-store review-decide \
+  --decisions /path/to/local/review-decisions.json \
+  --expected-version 'FULL_VERSION_FROM_THE_SHOWN_LIST'
+```
+
+For a project ledger, replace `--global-store` with `--root /path/to/project`. The response contains changed IDs and the resulting version. Unselected records stay unchanged; defer-only batches do not write anything. Confirmation writes user provenance and time without refreshing evidence dates. Unknown/duplicate IDs, invalid choices, or attempts to confirm conflicted records reject the entire batch. Resolve conflicts explicitly, then refresh the list before confirmation. If the ledger changed since display, show a fresh list and ask for new choices; never silently reuse the old choices against a new version.
+
+All mutating commands use a shared `.preferences.json.lock` beside the ledger and atomic file replacement, waiting at most five seconds. Refresh old Skill installs before concurrent use; older scripts do not honor this lock. If a process was forcibly terminated and left a lock, verify no writer is running before removing that exact stale lock. Review does not create report files or run automatically after analysis. Decision files, registry snapshots, and test ledgers are local runtime data and must not be uploaded with the Skill.
+
 ## Official references
 
 - [Codex Skill format and install paths](https://developers.openai.com/codex/skills)
@@ -142,6 +178,42 @@ python3 scripts/install_skill.py --agent codex
 - 有些 Harness 会在会话启动时缓存 Skill 目录。如果新安装的 Skill 未出现，请刷新 Skills 界面或新开会话。
 - DeepSeek Harness 的 `skill-filesystem` 提供方会搜索其文档说明的本地路径，并支持包含 `SKILL.md` 的目录包；项目级和用户级路径都可以自定义。
 - Zed 的全局 Skills 对 Zed Agent 生效；外部 Agent 和终端会话可能需要单独安装。
+
+#### 人工审核
+
+在任意已安装的 Agent 中说：“查看置信度超过 0.9 的待确认偏好”。Agent 只在你请求时返回精简清单，不列出支持证据的项目。可以回复：“确认 PF-001；拒绝 PF-002；PF-003 仅限当前项目；PF-004 暂缓”。仅修改范围不代表确认。
+
+从已安装 Skill 的目录运行以下命令，分别查看项目账本或共享全局账本：
+
+```sh
+python3 scripts/preference_tool.py --root /path/to/project review
+python3 scripts/preference_tool.py --global-store review --format json
+```
+
+`review` 默认输出便于阅读的文字；JSON 返回 `version`、`policy` 和 `candidates`。每条候选包含编号、描述、取值、置信度、待确认状态、最多 100 字的证据摘要、范围、验证日期、有效冲突编号和过期提示。筛选是严格 `> 0.9`，不是 `>= 0.9`；按置信度降序、编号升序排列，超过 180 天未验证时提示留意。这个命令不修改账本。
+
+Agent 保存你实际看到的清单版本，只把你选中的操作写到本机临时 JSON 文件。以下编号和范围仅作示例：
+
+```json
+[
+  {"id": "PF-001", "action": "confirm"},
+  {"id": "PF-002", "action": "reject"},
+  {"id": "PF-003", "scope": "仅当前项目：示例项目"},
+  {"id": "PF-004", "action": "defer"}
+]
+```
+
+只提供 `scope` 而省略 `action`，表示仅修改范围。用户明确要求同时确认和改范围时，`confirm` 也可附带 `scope`；暂缓 `defer` 不能同时改范围。使用清单返回的完整版本提交，替换示例中的版本和文件路径：
+
+```sh
+python3 scripts/preference_tool.py --global-store review-decide \
+  --decisions /path/to/local/review-decisions.json \
+  --expected-version 'FULL_VERSION_FROM_THE_SHOWN_LIST'
+```
+
+项目账本把 `--global-store` 换成 `--root /path/to/project`。命令返回已修改的编号和新版本。没选的保持原样；全部暂缓时不写入。确认只记下你的选择和时间，不把证据日期改成今天。编号写错、重复选择、操作不合法或确认尚有冲突的记录时，整批先不保存。先明确解决冲突，再刷新清单确认。若其他 Agent 改过账本，应重新展示清单让你选择，不能把旧选择偷偷套用到新内容上。
+
+所有写入命令使用账本旁的 `.preferences.json.lock` 排队，再一次性保存，最多等待五秒。并发使用前先刷新旧安装，否则旧脚本不会参与排队。如果进程被强制结束后留下锁文件，确认没有写入任务运行后再移除那一个残留锁。审核不创建报告文件，也不在日常分析后自动运行。选择文件、账本快照和测试账本是本机运行数据，不随 Skill 上传。
 
 #### 官方参考
 

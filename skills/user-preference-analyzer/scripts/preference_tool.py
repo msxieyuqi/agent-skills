@@ -4,12 +4,16 @@
 from __future__ import annotations
 
 import argparse
+import copy
+import hashlib
 import json
 import os
 import re
 import sys
 import tempfile
-from datetime import date, datetime
+import time
+from contextlib import contextmanager
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -89,6 +93,32 @@ def load_registry(path: Path) -> dict[str, Any]:
     return data
 
 
+@contextmanager
+def registry_lock(path: Path, timeout: float = 5.0):
+    """Serialize cooperating read-modify-write operations across Agent installs."""
+    lock = path.with_name(f".{path.name}.lock")
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            descriptor = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+            break
+        except FileExistsError:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise TimeoutError("账本正在被其他任务使用，请稍后重试。")
+            time.sleep(min(0.05, remaining))
+    try:
+        os.close(descriptor)
+        yield
+    finally:
+        lock.unlink()
+
+
+def registry_version(data: dict[str, Any]) -> str:
+    content = json.dumps(data, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+
 def atomic_write_json(path: Path, data: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, temp_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
@@ -138,6 +168,15 @@ def validate_registry(data: dict[str, Any]) -> list[str]:
             errors.append(f"{label}: invalid category")
         if item.get("confirmation_status") not in VALID_STATUSES:
             errors.append(f"{label}: invalid confirmation_status")
+        if "confirmation_method" in item and item["confirmation_method"] != "user":
+            errors.append(f"{label}: confirmation_method must be user")
+        if "confirmed_at" in item:
+            try:
+                confirmed = datetime.fromisoformat(item["confirmed_at"])
+                if confirmed.tzinfo is None:
+                    raise ValueError("timezone required")
+            except (TypeError, ValueError):
+                errors.append(f"{label}: confirmed_at must be an ISO timestamp with timezone")
         confidence = item.get("confidence")
         if not isinstance(confidence, (int, float)) or not 0 <= confidence <= 1:
             errors.append(f"{label}: confidence must be between 0 and 1")
@@ -164,6 +203,8 @@ def validate_registry(data: dict[str, Any]) -> list[str]:
             errors.append(f"{label}: possible secret detected; remove it before saving")
     if contains_secret(data.get("authorized_sources", [])):
         errors.append("authorized_sources: possible secret detected; remove it before saving")
+    if contains_secret(data.get("history", [])):
+        errors.append("history: possible secret detected; remove it before saving")
     return errors
 
 
@@ -188,7 +229,11 @@ def analyze_registry(data: dict[str, Any], stale_days: int) -> dict[str, Any]:
                         conflict_pairs.add((left["id"], right["id"]))
     for item in active:
         for other_id in item.get("conflicts_with", []):
-            if other_id in by_id:
+            if (
+                other_id in by_id
+                and other_id != item["id"]
+                and by_id[other_id]["confirmation_status"] not in {"rejected", "superseded"}
+            ):
                 conflict_pairs.add(tuple(sorted((item["id"], other_id))))
 
     today = date.today()
@@ -217,6 +262,128 @@ def analyze_registry(data: dict[str, Any], stale_days: int) -> dict[str, Any]:
         "stale": stale,
         "skill_proposals": proposals,
     }
+
+
+def review_registry(data: dict[str, Any]) -> dict[str, Any]:
+    analysis = analyze_registry(data, 180)
+    stale_ids = {item["id"] for item in analysis["stale"]}
+    candidates = []
+    for item in sorted(data["preferences"], key=lambda item: (-item["confidence"], item["id"])):
+        if item["confirmation_status"] != "proposed" or item["confidence"] <= 0.9:
+            continue
+        latest = max(item["evidence"], key=lambda entry: entry["observed_at"])
+        summary = " ".join(latest["detail"].split())
+        if len(summary) > 100:
+            summary = summary[:99] + "…"
+        conflicts = sorted({
+            other for pair in analysis["conflicts"] if item["id"] in pair
+            for other in pair if other != item["id"]
+        })
+        candidates.append({
+            "id": item["id"],
+            "description": item["description"],
+            "value": item["value"],
+            "confidence": item["confidence"],
+            "confirmation_status": item["confirmation_status"],
+            "evidence_summary": summary,
+            "scope": item["scope"],
+            "last_validated": item["last_validated"],
+            "conflicts_with": conflicts,
+            "stale": item["id"] in stale_ids,
+        })
+    return {
+        "version": registry_version(data),
+        "policy": {"confidence_gt": 0.9, "status": "proposed", "confirmation": "user", "stale_days": 180},
+        "candidates": candidates,
+    }
+
+
+def review_text(review: dict[str, Any]) -> str:
+    if not review["candidates"]:
+        return "暂无置信度超过 0.9 的待确认偏好。"
+    lines = ["高置信度待确认清单（置信度 > 0.9；人工确认）", ""]
+    for item in review["candidates"]:
+        notices = []
+        if item["conflicts_with"]:
+            notices.append("冲突：" + ", ".join(item["conflicts_with"]) + "，请先解决再确认")
+        if item["stale"]:
+            notices.append("已超过 180 天未验证")
+        lines.extend([
+            f"{item['id']} — {item['description']}",
+            f"置信度：{item['confidence']} | 状态：{item['confirmation_status']}",
+            f"证据摘要：{item['evidence_summary']}",
+            f"适用范围：{item['scope']} | 最近验证：{item['last_validated']}",
+            "提示：" + ("；".join(notices) or "未发现冲突或过期提示"),
+            "",
+        ])
+    lines.append(f"账本版本：{review['version']}")
+    return "\n".join(lines)
+
+
+def review_decisions(data: dict[str, Any], decisions: Any, expected_version: str) -> tuple[dict[str, Any], list[str]]:
+    """Validate the entire user-selected batch before applying any changes."""
+    if registry_version(data) != expected_version:
+        raise ValueError("账本已变化，请刷新清单后重新选择。")
+    if not isinstance(decisions, list) or not decisions:
+        raise ValueError("decisions must be a non-empty JSON array")
+    if contains_secret(decisions):
+        raise ValueError("possible secret detected; review decisions were not saved")
+    eligible = {item["id"]: item for item in review_registry(data)["candidates"]}
+    seen = set()
+    normalized = []
+    for decision in decisions:
+        if not isinstance(decision, dict) or set(decision) - {"id", "action", "scope"}:
+            raise ValueError("Each decision must contain only id, action, and optional scope")
+        record_id = decision.get("id")
+        if not isinstance(record_id, str) or record_id not in eligible:
+            raise ValueError(f"Not a current review candidate: {record_id}")
+        if record_id in seen:
+            raise ValueError(f"Duplicate decision: {record_id}")
+        seen.add(record_id)
+        action = decision.get("action")
+        if action is None and "scope" in decision:
+            action = "adjust_scope"
+        elif not isinstance(action, str) or action not in {"confirm", "reject", "defer"}:
+            raise ValueError(f"Invalid review action for {record_id}")
+        scope = decision.get("scope")
+        if "scope" in decision and (not isinstance(scope, str) or not scope.strip()):
+            raise ValueError(f"scope must be a non-empty string for {record_id}")
+        if action == "defer" and "scope" in decision:
+            raise ValueError("A deferred record cannot change scope; omit action for a scope-only change")
+        if action == "confirm" and eligible[record_id]["conflicts_with"]:
+            raise ValueError(f"{record_id} has unresolved conflicts; resolve them and refresh the list first")
+        normalized.append((record_id, action, scope))
+
+    updated = copy.deepcopy(data)
+    records = {item["id"]: item for item in updated["preferences"]}
+    changed = []
+    timestamp = datetime.now(timezone.utc).isoformat()
+    for record_id, action, scope in normalized:
+        if action == "defer":
+            continue
+        item = records[record_id]
+        before = {"confirmation_status": item["confirmation_status"], "scope": item["scope"]}
+        if scope is not None:
+            item["scope"] = scope
+        if action == "confirm":
+            item["confirmation_status"] = "confirmed"
+            item["confirmation_method"] = "user"
+            item["confirmed_at"] = timestamp
+        elif action == "reject":
+            item["confirmation_status"] = "rejected"
+        after = {"confirmation_status": item["confirmation_status"], "scope": item["scope"]}
+        if before == after:
+            continue
+        changed.append(record_id)
+        updated["history"].append({
+            "date": timestamp[:10], "at": timestamp, "action": "review", "method": "user",
+            "record_id": record_id, "before": before, "after": after,
+            "detail": f"{record_id}: user selected {action}; status {before['confirmation_status']} -> {after['confirmation_status']}; scope {before['scope']} -> {after['scope']}.",
+        })
+    errors = validate_registry(updated)
+    if errors:
+        raise ValueError("\n".join(errors))
+    return updated, changed
 
 
 def evidence_text(item: dict[str, Any]) -> str:
@@ -387,7 +554,8 @@ def update_record(data: dict[str, Any], args: argparse.Namespace) -> None:
             item[field] = value
     if args.evidence_source:
         item["evidence"].append(add_evidence_from_args(args))
-    item["last_validated"] = args.observed_at
+    if args.evidence_source:
+        item["last_validated"] = args.observed_at
     data["history"].append(
         {"date": args.observed_at, "action": "update", "detail": f"Updated {args.id}."}
     )
@@ -458,6 +626,11 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     subparsers.add_parser("validate")
+    review = subparsers.add_parser("review", help="Show high-confidence proposed preferences on request")
+    review.add_argument("--format", choices=["text", "json"], default="text")
+    decide = subparsers.add_parser("review-decide", help="Apply an explicitly user-selected review batch")
+    decide.add_argument("--decisions", type=Path, required=True, help="Local JSON array of user decisions")
+    decide.add_argument("--expected-version", required=True, help="Full version returned by review")
     analyze = subparsers.add_parser("analyze")
     analyze.add_argument("--stale-days", type=int, default=180)
     render = subparsers.add_parser("render")
@@ -503,17 +676,23 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main() -> int:
-    args = build_parser().parse_args()
-    if args.global_store:
-        root = global_store_root()
-        registry = root / "preferences.json"
-        if not getattr(args, "source_project", None):
-            args.source_project = Path.cwd().name
-    else:
-        root = Path(args.root).resolve()
-        registry = safe_path(root, args.registry)
+def run_command(args: argparse.Namespace, root: Path, registry: Path) -> int:
     data = load_registry(registry)
+    errors = validate_registry(data)
+    if errors:
+        raise ValueError("\n".join(errors))
+
+    if args.command == "review":
+        review = review_registry(data)
+        print(json.dumps(review, ensure_ascii=False, indent=2) if args.format == "json" else review_text(review))
+        return 0
+    if args.command == "review-decide":
+        decisions = json.loads(args.decisions.expanduser().read_text(encoding="utf-8"))
+        updated, changed = review_decisions(data, decisions, args.expected_version)
+        if changed:
+            atomic_write_json(registry, updated)
+        print(json.dumps({"changed": changed, "version": registry_version(updated)}, ensure_ascii=False))
+        return 0
 
     if args.command == "validate":
         errors = validate_registry(data)
@@ -566,6 +745,26 @@ def main() -> int:
     atomic_write_json(registry, data)
     print(f"OK: saved {registry}")
     return 0
+
+
+def main() -> int:
+    args = build_parser().parse_args()
+    try:
+        if args.global_store:
+            root = global_store_root()
+            registry = root / "preferences.json"
+            if not getattr(args, "source_project", None):
+                args.source_project = Path.cwd().name
+        else:
+            root = Path(args.root).resolve()
+            registry = safe_path(root, args.registry)
+        if args.command in {"add", "update", "authorize", "review-decide", "render"}:
+            with registry_lock(registry):
+                return run_command(args, root, registry)
+        return run_command(args, root, registry)
+    except (OSError, ValueError, TimeoutError) as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
 
 
 if __name__ == "__main__":

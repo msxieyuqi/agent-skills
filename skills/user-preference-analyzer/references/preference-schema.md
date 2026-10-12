@@ -21,6 +21,8 @@ This is the project-local registry. For a cross-project user-global registry, us
 | `conflicts_with` | List of record IDs with a known semantic conflict. |
 | `linked_skill` | Existing Skill name or `null`. |
 
+Manual review may add optional `confirmation_method: "user"` and `confirmed_at` (ISO timestamp with timezone). Existing records without these fields remain valid. Review entries in `history` include the record ID, user method, timestamp, and before/after status and scope. Reviewing does not update `last_validated`, confidence, or evidence. A scope-only decision keeps the record proposed; a deferred decision makes no changes.
+
 Each evidence object requires `source_type`, `source`, `observed_at`, and `detail`. It may also include `source_project` for global cross-project records. Refer to a conversation by title or bounded task identifier and summarize the relevant behavior; do not copy an entire private message.
 
 ## Confidence guide
@@ -71,6 +73,8 @@ A workflow can be proposed as a Skill when it has at least three independent evi
 | `confirmation_status` | `proposed`、`confirmed`、`rejected` 或 `superseded`。 |
 | `conflicts_with` | 已知语义冲突的记录 ID 列表。 |
 | `linked_skill` | 已有 Skill 名称，或 `null`。 |
+
+人工审核可增加可选字段 `confirmation_method: "user"` 和 `confirmed_at`（带时区的 ISO 时间戳）；旧记录没有这些字段也仍然有效。`history` 中的审核记录包含偏好编号、用户确认方式、时间，以及修改前后的状态和范围。审核不修改 `last_validated`、置信度或证据；仅修改范围后仍为待确认，暂缓则不作修改。
 
 每个证据对象必须包含 `source_type`、`source`、`observed_at` 和 `detail`。全局跨项目记录还可以包含 `source_project`。引用聊天时使用标题或范围明确的任务标识，并概述相关行为；不要复制整段私人消息。
 
