@@ -2,6 +2,8 @@
 
 Use `docs/preferences/preferences.json` as the canonical registry.
 
+This is the project-local registry. For a cross-project user-global registry, use the shared per-user location resolved by `scripts/preference_tool.py --global-store`; its `USER_PREFERENCE_HOME` override and operating-system defaults are documented in [cross-agent-installation.md](cross-agent-installation.md). Keep project-local and global registries distinct unless the user explicitly chooses one.
+
 ## Required record fields
 
 | Field | Meaning |
@@ -50,6 +52,8 @@ A workflow can be proposed as a Skill when it has at least three independent evi
 ### 偏好证据结构
 
 使用 `docs/preferences/preferences.json` 作为规范账本。
+
+这是项目本地账本。跨项目的用户全局账本应使用 `scripts/preference_tool.py --global-store` 解析的共享用户级位置；`USER_PREFERENCE_HOME` 覆盖项和各操作系统默认路径见 [cross-agent-installation.md](cross-agent-installation.md)。除非用户明确指定，否则不要混用项目本地账本和全局账本。
 
 #### 必填记录字段
 
