@@ -39,11 +39,21 @@ If you already have this Skill under Codex and use ZCode, ZCode's Settings → S
 All agents on the same machine should use the same ledger:
 
 ```text
-$CODEX_HOME/user-preferences/
+<shared per-user data directory>/user-preferences/
 └── preferences.json
 ```
 
-When `CODEX_HOME` is unset, the default is `~/.codex/user-preferences/`. Do not create separate ledgers under `.agents`, `.zcode`, or `.dsh`; per-tool ledgers would diverge. Each analysis agent must be able to read and write the configured shared ledger, and must use the installed Skill's `scripts/preference_tool.py`.
+`USER_PREFERENCE_HOME` can explicitly set the ledger directory on any operating system; it must point to the same directory for every Agent. If unset, the helper uses these defaults:
+
+| Operating system | Default directory |
+|---|---|
+| macOS | `~/Library/Application Support/user-preferences/` |
+| Windows | `%LOCALAPPDATA%\user-preferences\` |
+| Linux / other Unix | `${XDG_DATA_HOME:-~/.local/share}/user-preferences/` |
+
+The registry is `preferences.json`; `SOURCES.md` and generated reports live beside it. `CODEX_HOME` controls Codex Skill discovery only and is not used to locate the shared ledger. Do not create separate ledgers under `.agents`, `.zcode`, `.dsh`, or another Agent's home; per-tool ledgers would diverge. Each analysis Agent must have local read/write permission to the resolved shared directory and must use the installed Skill's `scripts/preference_tool.py`.
+
+On a first setup, initialize the shared store only when the user requests setup. If a legacy `~/.codex/user-preferences/` exists and differs from the resolved path, ask before migrating it; never silently copy it or create a parallel ledger. A custom shared path can be selected by setting `USER_PREFERENCE_HOME` consistently in each Agent's environment.
 
 On a new machine, copy the ledger and `SOURCES.md` only through an explicitly authorized local transfer. Do not upload private conversations to install a Skill. Skill installation moves reusable instructions and scripts; it does not move preference data.
 
@@ -106,11 +116,21 @@ python3 scripts/install_skill.py --agent codex
 同一台机器上的所有 Agent 应使用同一个账本：
 
 ```text
-$CODEX_HOME/user-preferences/
+<同一用户的数据目录>/user-preferences/
 └── preferences.json
 ```
 
-若未设置 `CODEX_HOME`，默认路径为 `~/.codex/user-preferences/`。不要在 `.agents`、`.zcode` 或 `.dsh` 下创建各自的账本副本，否则不同 Agent 的数据会分叉。每个分析 Agent 都必须具备访问已配置共享账本的本地权限，并调用已安装 Skill 中的 `scripts/preference_tool.py`。
+任何操作系统都可以通过 `USER_PREFERENCE_HOME` 显式指定账本目录；所有 Agent 必须解析到同一个目录。未设置时，辅助脚本使用以下默认值：
+
+| 操作系统 | 默认目录 |
+|---|---|
+| macOS | `~/Library/Application Support/user-preferences/` |
+| Windows | `%LOCALAPPDATA%\user-preferences\` |
+| Linux / 其他 Unix | `${XDG_DATA_HOME:-~/.local/share}/user-preferences/` |
+
+账本文件为 `preferences.json`；`SOURCES.md` 和生成的报告与它放在同一目录。`CODEX_HOME` 仅控制 Codex Skill 的发现位置，不用于定位共享账本。不要在 `.agents`、`.zcode`、`.dsh` 或其他 Agent 的专属目录创建账本副本，否则数据会分叉。每个分析 Agent 都必须具备对解析后共享目录的本地读写权限，并调用已安装 Skill 中的 `scripts/preference_tool.py`。
+
+首次设置时，只有用户明确要求初始化才创建共享账本。如果存在旧版 `~/.codex/user-preferences/` 且它与解析出的目录不同，迁移前必须询问；不得静默复制或创建并行账本。可以通过在每个 Agent 的运行环境中一致地设置 `USER_PREFERENCE_HOME` 来指定自定义共享路径。
 
 在新设备上，只有经过明确授权的本地传输才可以复制账本和 `SOURCES.md`。安装 Skill 时不要上传私人聊天。Skill 安装传输的是可复用说明和脚本，不传输偏好数据。
 
