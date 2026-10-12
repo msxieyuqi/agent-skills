@@ -68,7 +68,7 @@ On a new machine, copy the ledger and `SOURCES.md` only through an explicitly au
 
 ## Manual review
 
-In any installed Agent, ask: “查看置信度超过 0.9 的待确认偏好”. The Agent displays a concise list only on request, without a supporting-project list. Reply with record IDs, for example: “确认 PF-001；拒绝 PF-002；PF-003 仅限当前项目；PF-004 暂缓”. A scope-only change does not confirm the record.
+In any installed Agent, ask: “查看置信度超过 0.92 的待确认偏好”. The Agent displays a concise list only on request, without a supporting-project list. Reply with record IDs, for example: “确认 PF-001；拒绝 PF-002；PF-003 仅限当前项目；PF-004 暂缓”. A scope-only change does not confirm the record.
 
 From the installed Skill directory, inspect a project ledger or the shared global ledger:
 
@@ -77,7 +77,7 @@ python3 scripts/preference_tool.py --root /path/to/project review
 python3 scripts/preference_tool.py --global-store review --format json
 ```
 
-`review` defaults to readable text. JSON returns `version`, `policy`, and `candidates`. Each candidate contains ID, description, value, confidence, proposed status, evidence summary (at most 100 characters), scope, last validation date, active conflict IDs, and a stale flag. The filter is strictly `> 0.9`, not `>= 0.9`; records are sorted by confidence descending, then ID. Staleness uses 180 days. This command does not write the ledger.
+`review` defaults to readable text. JSON returns `version`, `policy`, and `candidates`. Each candidate contains ID, description, value, confidence, proposed status, evidence summary (at most 100 characters), scope, last validation date, active conflict IDs, and a stale flag. The filter is strictly `> 0.92`, not `>= 0.92`; records are sorted by confidence descending, then ID. Staleness uses 180 days. This command does not write the ledger.
 
 The Agent retains the version of the list actually shown and writes only the user's choices to a local temporary JSON file. Example input (illustrative IDs and scopes):
 
@@ -181,7 +181,7 @@ python3 scripts/install_skill.py --agent codex
 
 #### 人工审核
 
-在任意已安装的 Agent 中说：“查看置信度超过 0.9 的待确认偏好”。Agent 只在你请求时返回精简清单，不列出支持证据的项目。可以回复：“确认 PF-001；拒绝 PF-002；PF-003 仅限当前项目；PF-004 暂缓”。仅修改范围不代表确认。
+在任意已安装的 Agent 中说：“查看置信度超过 0.92 的待确认偏好”。Agent 只在你请求时返回精简清单，不列出支持证据的项目。可以回复：“确认 PF-001；拒绝 PF-002；PF-003 仅限当前项目；PF-004 暂缓”。仅修改范围不代表确认。
 
 从已安装 Skill 的目录运行以下命令，分别查看项目账本或共享全局账本：
 
@@ -190,7 +190,7 @@ python3 scripts/preference_tool.py --root /path/to/project review
 python3 scripts/preference_tool.py --global-store review --format json
 ```
 
-`review` 默认输出便于阅读的文字；JSON 返回 `version`、`policy` 和 `candidates`。每条候选包含编号、描述、取值、置信度、待确认状态、最多 100 字的证据摘要、范围、验证日期、有效冲突编号和过期提示。筛选是严格 `> 0.9`，不是 `>= 0.9`；按置信度降序、编号升序排列，超过 180 天未验证时提示留意。这个命令不修改账本。
+`review` 默认输出便于阅读的文字；JSON 返回 `version`、`policy` 和 `candidates`。每条候选包含编号、描述、取值、置信度、待确认状态、最多 100 字的证据摘要、范围、验证日期、有效冲突编号和过期提示。筛选是严格 `> 0.92`，不是 `>= 0.92`；按置信度降序、编号升序排列，超过 180 天未验证时提示留意。这个命令不修改账本。
 
 Agent 保存你实际看到的清单版本，只把你选中的操作写到本机临时 JSON 文件。以下编号和范围仅作示例：
 

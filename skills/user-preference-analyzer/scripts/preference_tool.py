@@ -19,6 +19,7 @@ from typing import Any
 
 
 VALID_STATUSES = {"proposed", "confirmed", "rejected", "superseded"}
+REVIEW_CONFIDENCE_THRESHOLD = 0.92
 VALID_CATEGORIES = {
     "communication",
     "documentation",
@@ -269,7 +270,7 @@ def review_registry(data: dict[str, Any]) -> dict[str, Any]:
     stale_ids = {item["id"] for item in analysis["stale"]}
     candidates = []
     for item in sorted(data["preferences"], key=lambda item: (-item["confidence"], item["id"])):
-        if item["confirmation_status"] != "proposed" or item["confidence"] <= 0.9:
+        if item["confirmation_status"] != "proposed" or item["confidence"] <= REVIEW_CONFIDENCE_THRESHOLD:
             continue
         latest = max(item["evidence"], key=lambda entry: entry["observed_at"])
         summary = " ".join(latest["detail"].split())
@@ -293,15 +294,15 @@ def review_registry(data: dict[str, Any]) -> dict[str, Any]:
         })
     return {
         "version": registry_version(data),
-        "policy": {"confidence_gt": 0.9, "status": "proposed", "confirmation": "user", "stale_days": 180},
+        "policy": {"confidence_gt": REVIEW_CONFIDENCE_THRESHOLD, "status": "proposed", "confirmation": "user", "stale_days": 180},
         "candidates": candidates,
     }
 
 
 def review_text(review: dict[str, Any]) -> str:
     if not review["candidates"]:
-        return "暂无置信度超过 0.9 的待确认偏好。"
-    lines = ["高置信度待确认清单（置信度 > 0.9；人工确认）", ""]
+        return f"暂无置信度超过 {REVIEW_CONFIDENCE_THRESHOLD} 的待确认偏好。"
+    lines = [f"高置信度待确认清单（置信度 > {REVIEW_CONFIDENCE_THRESHOLD}；人工确认）", ""]
     for item in review["candidates"]:
         notices = []
         if item["conflicts_with"]:

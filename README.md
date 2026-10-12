@@ -11,7 +11,7 @@ No preference ledger, source authorization manifest, chat transcript, project re
 
 The user-preference-analyzer stores its cross-agent preference ledger outside this repository. Set `USER_PREFERENCE_HOME` to choose a shared local directory; otherwise, its helper uses the operating system's per-user data directory. See that Skill's cross-agent installation reference for exact paths and migration safeguards.
 
-The user-preference-analyzer also supports on-request review of proposed preferences with confidence greater than `0.9`, followed by an explicitly user-selected batch decision. See its [manual review guide](skills/user-preference-analyzer/references/cross-agent-installation.md#manual-review). It does not automatically confirm inferred preferences.
+The user-preference-analyzer also supports on-request review of proposed preferences with confidence greater than `0.92`, followed by an explicitly user-selected batch decision. See its [manual review guide](skills/user-preference-analyzer/references/cross-agent-installation.md#manual-review). It does not automatically confirm inferred preferences.
 
 ## 中文版本（CN）
 
@@ -26,4 +26,4 @@ The user-preference-analyzer also supports on-request review of proposed prefere
 
 `user-preference-analyzer` 的跨 Agent 偏好账本保存在本仓库之外。可通过 `USER_PREFERENCE_HOME` 指定本机共享目录；未设置时，其辅助工具使用操作系统的用户数据目录。具体路径和迁移保护措施见该 Skill 的跨 Agent 安装说明。
 
-`user-preference-analyzer` 支持按需查看置信度超过 `0.9` 的待确认偏好，再按照用户选择批量审核。调用方式见[人工审核说明](skills/user-preference-analyzer/references/cross-agent-installation.md#manual-review)；推断出的偏好不会自动确认。
+`user-preference-analyzer` 支持按需查看置信度超过 `0.92` 的待确认偏好，再按照用户选择批量审核。调用方式见[人工审核说明](skills/user-preference-analyzer/references/cross-agent-installation.md#manual-review)；推断出的偏好不会自动确认。

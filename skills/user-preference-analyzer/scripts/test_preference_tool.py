@@ -32,18 +32,19 @@ class ReviewTests(unittest.TestCase):
     def test_strict_threshold_status_sort_and_compact_evidence(self):
         long = record("A", 0.99)
         long["evidence"][0]["detail"] = "字" * 150
-        data = registry(record("B", 0.99), long, record("C", 0.9001), record("D", 0.9),
+        data = registry(record("B", 0.99), long, record("C", 0.9201), record("D", 0.92), record("H", 0.91),
                         record("E", 1.0, "confirmed"), record("F", 1.0, "rejected"),
                         record("G", 1.0, "superseded"))
         before = copy.deepcopy(data)
         result = tool.review_registry(data)
         self.assertEqual([x["id"] for x in result["candidates"]], ["A", "B", "C"])
+        self.assertEqual(result["policy"]["confidence_gt"], 0.92)
         self.assertEqual(len(result["candidates"][0]["evidence_summary"]), 100)
         self.assertNotIn("fictional-project", json.dumps(result))
         self.assertEqual(data, before)
 
     def test_empty_review_and_stale_boundary(self):
-        self.assertEqual(tool.review_text(tool.review_registry(registry())), "暂无置信度超过 0.9 的待确认偏好。")
+        self.assertEqual(tool.review_text(tool.review_registry(registry())), "暂无置信度超过 0.92 的待确认偏好。")
         a, b = record("A"), record("B")
         a["last_validated"] = (date.today() - timedelta(days=180)).isoformat()
         b["last_validated"] = (date.today() - timedelta(days=181)).isoformat()
@@ -73,7 +74,7 @@ class ReviewTests(unittest.TestCase):
         self.assertEqual(tool.validate_registry(updated), [])
 
     def test_invalid_batches_never_partially_mutate(self):
-        data = registry(record("A"), record("LOW", 0.9))
+        data = registry(record("A"), record("LOW", 0.92))
         cases = [
             [{"id": "A", "action": "confirm"}, {"id": "missing", "action": "confirm"}],
             [{"id": "A", "action": "confirm"}, {"id": "A", "action": "reject"}],

@@ -66,7 +66,7 @@ Treat items older than the selected stale threshold as review candidates, not as
 
 When the user asks to see pending/high-confidence preferences, run `scripts/preference_tool.py review --format json` (with `--global-store` before the command for a global ledger). Read [the manual review guide](references/cross-agent-installation.md#manual-review) for commands and decision-file examples. Do not automatically show this list after ordinary analysis or updates.
 
-Show only `proposed` records with confidence strictly greater than `0.9`, ordered by descending confidence and then ID. Display the ID, description, exact confidence, status, a short evidence summary, scope, last validation date, and conflict/staleness notices. Put the manual-confirmation policy once above the list; omit supporting-project lists and keep source provenance in the ledger. If empty, say so in one sentence. Keep the full returned `version` for the later decision; it need not be shown to the user.
+Show only `proposed` records with confidence strictly greater than `0.92`, ordered by descending confidence and then ID. Display the ID, description, exact confidence, status, a short evidence summary, scope, last validation date, and conflict/staleness notices. Put the manual-confirmation policy once above the list; omit supporting-project lists and keep source provenance in the ledger. If empty, say so in one sentence. Keep the full returned `version` for the later decision; it need not be shown to the user.
 
 Translate explicit user choices into `review-decide` input: confirm, reject, defer, or a scope-only change. “确认 PF-001；PF-002 仅限当前项目” confirms only PF-001; PF-002 remains proposed with a concrete project scope. Do not invent choices for unselected records, silently replace the reviewed version, or treat a high score as confirmation. Ask only about ambiguous choices. Keep decision files in an authorized local temporary location and out of the repository.
 
@@ -149,7 +149,7 @@ Propose a new Skill when a bounded workflow has at least three independent evide
 
 用户要求“查看待确认偏好”或“查看高置信度清单”时，运行 `scripts/preference_tool.py review --format json`；全局账本在命令前增加 `--global-store`。命令和选择文件示例见[人工审核说明](references/cross-agent-installation.md#manual-review)。日常分析或更新后不自动展示清单。
 
-清单只包含置信度严格大于 `0.9` 的 `proposed` 记录，按置信度降序、ID 升序排列。展示编号、偏好描述、准确置信度、状态、简短证据摘要、适用范围、最近验证日期以及冲突和过期提示。人工确认策略在顶部说明一次，不列出支持证据的项目；完整来源留在账本中。没有候选时只提示一句。保存返回的完整 `version` 用于后续提交，不必向用户展示这串技术信息。
+清单只包含置信度严格大于 `0.92` 的 `proposed` 记录，按置信度降序、ID 升序排列。展示编号、偏好描述、准确置信度、状态、简短证据摘要、适用范围、最近验证日期以及冲突和过期提示。人工确认策略在顶部说明一次，不列出支持证据的项目；完整来源留在账本中。没有候选时只提示一句。保存返回的完整 `version` 用于后续提交，不必向用户展示这串技术信息。
 
 把用户的明确选择转换为 `review-decide` 输入：确认、拒绝、暂缓或仅修改范围。“确认 PF-001；PF-002 仅限当前项目”只确认 PF-001，PF-002 仍为待确认，并使用明确的项目范围。没选的就不改，没说清楚的只询问那一条。不要替换已展示清单对应的版本，也不要凭高分自动确认。选择文件保存在获准的本机临时位置，不提交到仓库。
 
