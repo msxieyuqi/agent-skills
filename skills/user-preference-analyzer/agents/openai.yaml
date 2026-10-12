@@ -1,0 +1,4 @@
+interface:
+  display_name: "User Preference Analyzer"
+  short_description: "Extract evidence-backed user preferences and workflows"
+  default_prompt: "Use $user-preference-analyzer to analyze or update this project’s evidence-backed user preference records."
