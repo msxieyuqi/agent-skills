@@ -7,6 +7,7 @@ import argparse
 import json
 import os
 import re
+import sys
 import tempfile
 from datetime import date, datetime
 from pathlib import Path
@@ -59,6 +60,22 @@ def safe_path(root: Path, candidate: str) -> Path:
     except ValueError as exc:
         raise ValueError(f"Path escapes project root: {candidate}") from exc
     return path
+
+
+def global_store_root() -> Path:
+    """Resolve the Agent-neutral per-user ledger directory."""
+    configured = os.environ.get("USER_PREFERENCE_HOME")
+    if configured:
+        return Path(configured).expanduser().resolve()
+
+    home = Path.home()
+    if sys.platform == "win32":
+        data_home = Path(os.environ.get("LOCALAPPDATA", home / "AppData/Local"))
+    elif sys.platform == "darwin":
+        data_home = home / "Library/Application Support"
+    else:
+        data_home = Path(os.environ.get("XDG_DATA_HOME", home / ".local/share"))
+    return (data_home.expanduser() / "user-preferences").resolve()
 
 
 def load_registry(path: Path) -> dict[str, Any]:
@@ -433,7 +450,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--global-store",
         action="store_true",
-        help="Use ~/.codex/user-preferences instead of the current project",
+        help="Use the shared per-user preference store instead of the current project",
     )
     parser.add_argument(
         "--registry", default="docs/preferences/preferences.json", help="Registry path within root"
@@ -489,8 +506,7 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> int:
     args = build_parser().parse_args()
     if args.global_store:
-        codex_home = Path(os.environ.get("CODEX_HOME", Path.home() / ".codex"))
-        root = codex_home / "user-preferences"
+        root = global_store_root()
         registry = root / "preferences.json"
         if not getattr(args, "source_project", None):
             args.source_project = Path.cwd().name
