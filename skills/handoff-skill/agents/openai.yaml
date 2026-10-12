@@ -1,0 +1,7 @@
+interface:
+  display_name: "Handoff Skill"
+  short_description: "Create portable task handoffs for a new agent"
+  default_prompt: "Use $handoff-skill to prepare a concise handoff for another agent."
+
+policy:
+  allow_implicit_invocation: false
