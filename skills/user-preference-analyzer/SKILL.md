@@ -12,8 +12,8 @@ Build a useful memory layer without turning guesses into rules.
 This Skill can maintain either a project-local ledger or a user-global ledger.
 
 - Project-local mode writes `docs/preferences/` in the current project.
-- Global mode writes the cumulative ledger under `~/.codex/user-preferences/` and can be invoked from any project after the Skill is installed globally.
-- Before global mode, read `~/.codex/user-preferences/SOURCES.md`. Only projects and conversation identifiers listed there are in scope.
+- Global mode writes the cumulative ledger to the Agent-neutral per-user location resolved by `scripts/preference_tool.py`: `USER_PREFERENCE_HOME` when configured, otherwise the operating system's user data directory (see [references/cross-agent-installation.md](references/cross-agent-installation.md)).
+- Before global mode, read `SOURCES.md` beside the resolved global `preferences.json`. Only projects and conversation identifiers listed there are in scope.
 - Add a short `source_project` label to new global evidence. Prefer a project name or stable ID; do not store absolute paths unless the user explicitly asks for them.
 - Global mode is still evidence collection, not automatic authorization to read every project or every conversation.
 - This package follows the portable Agent Skills folder format. Tool-specific discovery paths and invocation syntax are documented in [references/cross-agent-installation.md](references/cross-agent-installation.md).
@@ -48,11 +48,11 @@ Do not interpret “帮我看看更多历史” as permission to read all chats.
 5. Run `scripts/preference_tool.py validate`, `analyze`, and `render` from this Skill's installed directory, using the current interpreter available to the agent.
 6. Review generated reports for scope leakage. Keep unconfirmed conclusions as `proposed`.
 
-For a global update, run the same script with `--global-store`; it resolves the registry to `$CODEX_HOME/user-preferences/preferences.json` or, when `CODEX_HOME` is unset, `~/.codex/user-preferences/preferences.json`. Reports are written beside the registry.
+For a global update, run the same script with `--global-store`; it resolves the registry to `$USER_PREFERENCE_HOME/preferences.json` when configured, otherwise to the platform-specific per-user data directory documented in [references/cross-agent-installation.md](references/cross-agent-installation.md). Reports are written beside the registry. `CODEX_HOME` controls Codex Skill discovery only; it does not select the shared preference ledger.
 
 To persist an explicit authorization, use this Skill's `scripts/preference_tool.py --global-store authorize ...` with fields derived from the user's request. The command updates the global `SOURCES.md` and preserves an audit entry.
 
-When authorizing or updating the global store, first check that the target store exists. If it does not, ask the user where they want the shared store, or initialize it only when the user requested setup. Do not silently create a per-tool copy of the preference ledger.
+When authorizing or updating the global store, first check that the target store exists. If it does not, ask the user where they want the shared store, or initialize it only when the user requested setup. If a legacy Codex-only ledger exists, ask before migrating it and do not silently copy or split its data. Do not create a per-tool copy of the preference ledger.
 
 ## Update
 
@@ -85,8 +85,8 @@ Propose a new Skill when a bounded workflow has at least three independent evide
 本 Skill 可维护项目本地账本或用户全局账本。
 
 - 项目本地模式将结果写入当前项目的 `docs/preferences/`。
-- 全局模式将累积账本写入 `~/.codex/user-preferences/`；全局安装后可从任意项目调用。
-- 使用全局模式前，先读取 `~/.codex/user-preferences/SOURCES.md`。只处理其中列出的项目和会话标识。
+- 全局模式将累积账本写入 `scripts/preference_tool.py` 解析的 Agent 无关用户级位置：优先使用 `USER_PREFERENCE_HOME`，否则使用操作系统的用户数据目录（见 [references/cross-agent-installation.md](references/cross-agent-installation.md)）；全局安装后可从任意项目调用。
+- 使用全局模式前，先读取解析出的全局 `preferences.json` 同目录下的 `SOURCES.md`。只处理其中列出的项目和会话标识。
 - 新增全局证据时附上简短的 `source_project` 标签。优先使用项目名称或稳定 ID；除非用户明确要求，不保存绝对路径。
 - 全局模式仅表示收集证据，不代表自动获准读取所有项目或会话。
 - 本包采用可移植的 Agent Skills 目录格式。各工具的发现路径和调用方法见 [references/cross-agent-installation.md](references/cross-agent-installation.md)。
@@ -121,11 +121,11 @@ Propose a new Skill when a bounded workflow has at least three independent evide
 5. 使用当前 Agent 可用的解释器，从本 Skill 的安装目录运行 `scripts/preference_tool.py validate`、`analyze` 和 `render`。
 6. 检查生成报告是否越界；未确认的结论保持 `proposed` 状态。
 
-全局更新时，对同一脚本使用 `--global-store`。账本路径解析为 `$CODEX_HOME/user-preferences/preferences.json`；若未设置 `CODEX_HOME`，则为 `~/.codex/user-preferences/preferences.json`。报告写在账本所在目录。
+全局更新时，对同一脚本使用 `--global-store`。账本路径优先解析为 `$USER_PREFERENCE_HOME/preferences.json`；未设置时，使用 [references/cross-agent-installation.md](references/cross-agent-installation.md) 所列操作系统用户数据目录。报告写在账本所在目录。`CODEX_HOME` 仅用于 Codex Skill 发现，不决定共享偏好账本位置。
 
 要保存明确授权，使用本 Skill 的 `scripts/preference_tool.py --global-store authorize ...`，参数只能来自用户请求。命令会更新全局 `SOURCES.md` 并保留审计记录。
 
-授权或更新全局账本前，先确认目标账本存在。若不存在，询问用户希望使用的共享位置；只有用户明确要求初始化时才创建。不要静默创建按 Agent 分散的账本副本。
+授权或更新全局账本前，先确认目标账本存在。若不存在，询问用户希望使用的共享位置；只有用户明确要求初始化时才创建。若发现旧版 Codex 专用账本，迁移前先询问，不要静默复制或拆分数据。不要创建按 Agent 分散的账本副本。
 
 ### 更新
 
